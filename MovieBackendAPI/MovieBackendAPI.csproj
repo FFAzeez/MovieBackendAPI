@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
+		<PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.21.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.9" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.9">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="6.0.9" />
+		<PackageReference Include="microsoft.extensions.configuration.usersecrets" Version="6.0.1" />
+		<PackageReference Include="prometheus-net" Version="6.0.0" />
+		<PackageReference Include="prometheus-net.AspNetCore" Version="6.0.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Resources\SampleDocuments\*.pdf">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Resources\Templates\*.txt">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="Resources\SampleDocuments\invoice_template.html">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\SampleDocuments\invoice_template_old.html">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\SampleDocuments\quotation_template_lastexpense.html">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\SampleDocuments\quotation_template.html">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\SampleDocuments\quotation_template_lastexpense_old.html">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\SampleDocuments\quotation_template_old.html">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+		<None Update="Resources\SampleDocuments\invoice_template_old.html">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="JsonData\" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\MovieBackendAPI.Business\MovieBackendAPI.Business.csproj" />
+	  <ProjectReference Include="..\MovieBackendAPI.Domain\MovieBackendAPI.Domain.csproj" />
+	  <ProjectReference Include="..\MovieBackendAPI.Infrastructure\MovieBackendAPI.Infrastructure.csproj" />
+	</ItemGroup>
+
+</Project>

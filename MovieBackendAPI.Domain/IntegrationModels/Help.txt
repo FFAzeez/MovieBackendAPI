@@ -1,0 +1,5 @@
+﻿If you integrate to third parties and you need to create models for request and response
+
+1. Create a folder for each integration
+2. Create Request Models
+3. Create Response Models

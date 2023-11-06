@@ -1,0 +1,22 @@
+
+Migration
+----------------------------------------
+From package Manager console
+Add-Migration AddMorreQuoteColumn 
+Update-Database -verbose
+
+
+
+1. Check the models folder and only create models related to the project.
+2.  
+
+
+
+https://dev.azure.com/nlpc-pfa/BPM/_git/FleetManagement
+
+
+git init
+git add .
+git commit -m "Initial"
+git remote add origin https://dev.azure.com/nlpc-pfa/BPM/_git/FleetManagement
+git push -u origin --all

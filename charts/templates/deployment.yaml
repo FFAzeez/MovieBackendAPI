@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+    spec:
+      containers:
+      - name: {{ .Values.name }}
+        image: "{{ .Values.image.repository }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # resources:
+        #     requests:
+        #       memory: "2048Mi"
+        #       cpu: "400m"
+        #     limits:
+        #       memory: "4096Mi"
+        #       cpu: "800m"
+        ports:
+        - containerPort: 8061
+          # livenessProbe:
+          #   httpGet:
+          #     path: /{{ .Values.namespace }}/{{ .Values.name }}/healthcheck
+          #     port: 8069
+          #     httpHeaders:
+          #     - name: Accept
+          #       value: application/json
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 30
+          # readinessProbe:
+          #   httpGet:
+          #     path: /{{ .Values.namespace }}/{{ .Values.name }}/healthcheck
+          #     port: 8069
+          #     httpHeaders:
+          #     - name: Accept
+          #       value: application/json
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 5
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: {{ .Values.env }}
+        - name: OMNI_SQLSERVER_NAME
+          valueFrom:
+            secretKeyRef:
+              name: sqlserver-credentials
+              key: SQLSERVER_NAME
+        - name: OMNI_SQLSERVER_USER
+          valueFrom:
+            secretKeyRef:
+              name: sqlserver-credentials
+              key: SQLSERVER_USER
+        - name: OMNI_SQLSERVER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sqlserver-credentials
+              key: SQLSERVER_PASSWORD
+        - name: OMNI_REDIS__HOST_NAME
+          valueFrom:
+            secretKeyRef:
+              name: az-redis-cache
+              key: CACHE_HOST_NAME
+        - name: OMNI_REDIS__ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: az-redis-cache
+              key: ACCESS_KEY
+        - name: OMNI_KEY_VAULT_NAME
+          valueFrom:
+            secretKeyRef:
+              name: az-keyvault-credentials
+              key: KEY_VAULT_NAME
+        - name: APPINSIGHTS_INSTRUMENTATIONKEY
+          valueFrom:
+            secretKeyRef:
+              name: appinsight-credentials
+              key: INSTRUMENTATION_KEY              
+        envFrom:
+        - secretRef:
+            name: az-keyvault-credentials
+        volumeMounts:
+        - name: secrets-store-inline
+          mountPath: "/mnt/secrets-store"
+          readOnly: true
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "spc-omni-insureservice"
+            nodePublishSecretRef:
+              name: secrets-store-creds

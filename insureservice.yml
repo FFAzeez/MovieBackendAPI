@@ -1,0 +1,443 @@
+## Author: Kennedy Kinyanjui - DevOps | Cloud | SRE
+
+trigger:
+  branches:
+    include:
+    - master
+    - release
+    - develop
+
+variables:
+  dockerRegistryServiceConnection: 'acromnichannel'
+  DEVImageRepository: 'insureservice-dev'
+  UATImageRepository: 'insureservice-uat'
+  imageRepository: 'insureservice'
+  containerRegistry: 'acromnichannel.azurecr.io'
+
+  tag: '$(Build.BuildId)'
+
+  appName: 'insureservice'
+  apiName: 'InsureService'
+
+  namespace: 'default'
+  
+  dockerfilePath: 'InsureService/Dockerfile'
+
+  devEnv: 'development'
+  uatEnv: 'uat'
+  prodEnv: 'preprod'
+
+  devKeyvault: 'kv-omnichannel-dev'
+  uatKeyvault: 'kv-uat-omnichannel'
+  prodKeyvault: 'kv-preprod-omnichannel'
+
+  subscription: 'Enterprise Core'
+
+  vmImageName: 'ubuntu-latest'
+  
+  buildConfiguration: 'Release'
+
+stages:
+- stage: BuildDEV
+  condition: and(always(), contains(variables['Build.SourceBranch'], 'refs/heads/develop'))
+  displayName: Build DEV
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: $(subscription)
+        KeyVaultName: $(devKeyvault)
+        SecretsFilter: '*'
+        RunAsPreJob: false
+
+    - task: replacetokens@3
+      inputs:
+        targetFiles: |
+          **/*development.json
+        encoding: 'auto'
+        writeBOM: true
+        actionOnMissing: 'warn'
+        keepToken: false
+        tokenPrefix: '#{'
+        tokenSuffix: '}#'
+        useLegacyPattern: false
+        enableTransforms: false
+        enableTelemetry: true
+
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush        
+        repository: $(DEVImageRepository)
+        dockerfile: $(dockerfilePath)
+        buildContext: $(system.defaultworkingdirectory)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+    # - script: |
+    #     wget https://download.defensecode.com/latest/clients/tscli.tar.gz -O tscli.tar.gz
+    #     tar xvzf tscli.tar.gz
+    #   displayName: 'Download/Extract ThunderScan API CLI'
+
+    # - script: |
+    #     ./tscli --upload $(system.defaultworkingdirectory) --threshold "high:10" --engines 2 --report --formats "html,json" --filename "$(appName)-report" --name "$(appName)-$(tag)"
+    #   displayName: 'ThunderScan Scan'
+
+    # - publish: $(appName)-report.html
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan HTML Report
+
+    # - publish: $(appName)-report.json
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan JSON Report
+
+    - task: UseDotNet@2
+      inputs:
+        version: '6.0.x'
+        includePreviewVersions: false
+    # - task: UseDotNet@2
+    #   inputs:
+    #     version: '5.0.x'
+    #     includePreviewVersions: false
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore tools'
+      inputs:
+        command: custom
+        custom: tool
+        arguments: 'restore'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build API'
+      inputs:
+        command: build
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: CmdLine@2
+      displayName: Create specs directory
+      inputs:
+        script: 'mkdir $(Build.ArtifactStagingDirectory)/specs'
+
+    - task: CmdLine@2
+      displayName: Generate swagger file
+      inputs:
+        script: |
+        
+          dotnet new tool-manifest
+          
+          dotnet tool install --version 6.2.3 Swashbuckle.AspNetCore.Cli
+          
+          cd $(system.defaultworkingdirectory)/$(apiName)/bin/Release/net6.0
+          
+          dotnet swagger tofile --output $(Build.ArtifactStagingDirectory)/specs/$(apiName).v1.json InsureService.API.dll v1
+
+        workingDirectory: '$(system.defaultworkingdirectory)'
+
+    - task: HelmInstaller@0
+      inputs:
+        helmVersion: '3.4.0'
+        installKubectl: true
+        kubectlVersion: '1.20.0'
+
+    - task: Bash@3
+      displayName: DEV Bake API yaml manifest (deployment + service + secrets-provider-class)
+      inputs:
+        targetType: 'inline'
+        script: 'helm template $(DEVImageRepository) charts --set keyvaultName=$(devKeyvault) --set image.repository=$(containerRegistry)/$(DEVImageRepository):$(tag) --set api.name=$(DEVImageRepository) --set name=$(appName) --set namespace=$(namespace) --set env=$(devEnv) > $(system.defaultworkingdirectory)/$(appName)-$(devEnv).yaml'
+
+    - task: CopyFiles@2
+      displayName: 'DEV Copy Files to: $(build.artifactstagingdirectory)'
+      inputs:
+         SourceFolder: '$(system.defaultworkingdirectory)'
+         Contents: '$(appName)-$(devEnv).yaml'
+         TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: CopyFiles@2
+      displayName: 'Copy Swagger File to: $(build.artifactstagingdirectory)'
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)'
+        Contents: |
+          **/$(apiName).v1.json
+        TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact drop'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: BuildUAT
+  condition: and(always(), contains(variables['Build.SourceBranch'], 'refs/heads/release'))
+  displayName: Build UAT
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: $(subscription)
+        KeyVaultName: $(uatKeyvault)
+        SecretsFilter: '*'
+        RunAsPreJob: false
+
+    - task: replacetokens@3
+      inputs:
+        targetFiles: |
+          **/*uat.json
+        encoding: 'auto'
+        writeBOM: true
+        actionOnMissing: 'warn'
+        keepToken: false
+        tokenPrefix: '#{'
+        tokenSuffix: '}#'
+        useLegacyPattern: false
+        enableTransforms: false
+        enableTelemetry: true
+
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush        
+        repository: $(UATImageRepository)
+        dockerfile: $(dockerfilePath)
+        buildContext: $(system.defaultworkingdirectory)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+    # - script: |
+    #     wget https://download.defensecode.com/latest/clients/tscli.tar.gz -O tscli.tar.gz
+    #     tar xvzf tscli.tar.gz
+    #   displayName: 'Download/Extract ThunderScan API CLI'
+
+    # - script: |
+    #     ./tscli --upload $(system.defaultworkingdirectory) --threshold "high:10" --engines 2 --report --formats "html,json" --filename "$(appName)-report" --name "$(appName)-$(tag)"
+    #   displayName: 'ThunderScan Scan'
+
+    # - publish: $(appName)-report.html
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan HTML Report
+
+    # - publish: $(appName)-report.json
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan JSON Report
+
+    - task: UseDotNet@2
+      inputs:
+        version: '6.0.x'
+        includePreviewVersions: false
+    # - task: UseDotNet@2
+    #   inputs:
+    #     version: '5.0.x'
+    #     includePreviewVersions: false
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore tools'
+      inputs:
+        command: custom
+        custom: tool
+        arguments: 'restore'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build API'
+      inputs:
+        command: build
+        arguments: '--configuration $(buildConfiguration)'
+        
+    - task: CmdLine@2
+      displayName: Create specs directory
+      inputs:
+        script: 'mkdir $(Build.ArtifactStagingDirectory)/specs'
+        
+    - task: CmdLine@2
+      displayName: Generate swagger file
+      inputs:
+        script: |
+        
+          dotnet new tool-manifest
+          
+          dotnet tool install --version 6.2.3 Swashbuckle.AspNetCore.Cli
+          
+          cd $(system.defaultworkingdirectory)/$(apiName)/bin/Release/net6.0
+          
+          dotnet swagger tofile --output $(Build.ArtifactStagingDirectory)/specs/$(apiName).v1.json InsureService.API.dll v1
+
+        workingDirectory: '$(system.defaultworkingdirectory)'
+
+    - task: HelmInstaller@0
+      inputs:
+        helmVersion: '3.4.0'
+        installKubectl: true
+        kubectlVersion: '1.20.0'
+
+    - task: Bash@3
+      displayName: UAT Bake API yaml manifest (deployment + service)
+      inputs:
+        targetType: 'inline'
+        script: 'helm template $(UATImageRepository) charts --set keyvaultName=$(uatKeyvault) --set image.repository=$(containerRegistry)/$(UATImageRepository):$(tag) --set api.name=$(UATImageRepository) --set name=$(appName) --set namespace=$(namespace) --set env=$(uatEnv) > $(system.defaultworkingdirectory)/$(appName)-$(uatEnv).yaml'
+
+    - task: CopyFiles@2
+      displayName: 'UAT Copy Files to: $(build.artifactstagingdirectory)'
+      inputs:
+         SourceFolder: '$(system.defaultworkingdirectory)'
+         Contents: '$(appName)-$(uatEnv).yaml'
+         TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: CopyFiles@2
+      displayName: 'Copy Swagger File to: $(build.artifactstagingdirectory)'
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)'
+        Contents: |
+          **/$(apiName).v1.json
+        TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact drop'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+- stage: BuildPROD
+  condition: and(always(), contains(variables['Build.SourceBranch'], 'refs/heads/master'))
+  displayName: Build PROD
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+
+    - task: AzureKeyVault@2
+      inputs:
+        azureSubscription: $(subscription)
+        KeyVaultName: $(prodKeyvault)
+        SecretsFilter: '*'
+        RunAsPreJob: false
+      
+    - task: replacetokens@3
+      inputs:
+        targetFiles: |
+          **/*preprod.json
+        encoding: 'auto'
+        writeBOM: true
+        actionOnMissing: 'warn'
+        keepToken: false
+        tokenPrefix: '#{'
+        tokenSuffix: '}#'
+        useLegacyPattern: false
+        enableTransforms: false
+        enableTelemetry: true
+
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush        
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        buildContext: $(system.defaultworkingdirectory)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+    # - script: |
+    #     wget https://download.defensecode.com/latest/clients/tscli.tar.gz -O tscli.tar.gz
+    #     tar xvzf tscli.tar.gz
+    #   displayName: 'Download/Extract ThunderScan API CLI'
+
+    # - script: |
+    #     ./tscli --upload $(system.defaultworkingdirectory) --threshold "high:10" --engines 2 --report --formats "html,json" --filename "$(appName)-report" --name "$(appName)-$(tag)"
+    #   displayName: 'ThunderScan Scan'
+
+    # - publish: $(appName)-report.html
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan HTML Report
+
+    # - publish: $(appName)-report.json
+    #   condition: succeededOrFailed()
+    #   artifact: ThunderScan JSON Report
+    - task: UseDotNet@2
+      inputs:
+        version: '6.0.x'
+        includePreviewVersions: false
+    # - task: UseDotNet@2
+    #   inputs:
+    #     version: '5.0.x'
+    #     includePreviewVersions: false
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore tools'
+      inputs:
+        command: custom
+        custom: tool
+        arguments: 'restore'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Build API'
+      inputs:
+        command: build
+        arguments: '--configuration $(buildConfiguration)'
+
+    - task: CmdLine@2
+      displayName: Create specs directory
+      inputs:
+        script: 'mkdir $(Build.ArtifactStagingDirectory)/specs'
+        
+    - task: CmdLine@2
+      displayName: Generate swagger file
+      inputs:
+        script: |
+        
+          dotnet new tool-manifest
+          
+          dotnet tool install --version 6.2.3 Swashbuckle.AspNetCore.Cli
+          
+          cd $(system.defaultworkingdirectory)/$(apiName)/bin/Release/net6.0
+          
+          dotnet swagger tofile --output $(Build.ArtifactStagingDirectory)/specs/$(apiName).v1.json InsureService.API.dll v1
+
+        workingDirectory: '$(system.defaultworkingdirectory)'
+
+    - task: HelmInstaller@0
+      inputs:
+        helmVersion: '3.4.0'
+        installKubectl: true
+        kubectlVersion: '1.20.0'
+
+    - task: Bash@3
+      displayName: PROD Bake API yaml manifest (deployment + service)
+      inputs:
+        targetType: 'inline'
+        script: 'helm template $(imageRepository) charts --set keyvaultName=$(prodKeyvault) --set image.repository=$(containerRegistry)/$(imageRepository):$(tag) --set api.name=$(imageRepository) --set name=$(appName) --set namespace=$(namespace) --set env=$(prodEnv)> $(system.defaultworkingdirectory)/$(appName)-$(prodEnv).yaml'
+    
+    - task: CopyFiles@2
+      displayName: 'PROD Copy Files to: $(build.artifactstagingdirectory)'
+      inputs:
+         SourceFolder: '$(system.defaultworkingdirectory)'
+         Contents: '$(appName)-$(prodEnv).yaml'
+         TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: CopyFiles@2
+      displayName: 'Copy Swagger File to: $(build.artifactstagingdirectory)'
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)'
+        Contents: |
+          **/$(apiName).v1.json
+        TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact drop'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'        

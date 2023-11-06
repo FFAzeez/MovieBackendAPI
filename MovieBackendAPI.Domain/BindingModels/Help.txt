@@ -1,0 +1,2 @@
+﻿
+This folder should only have models for binding

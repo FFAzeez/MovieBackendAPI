@@ -1,0 +1,94 @@
+﻿* {
+    margin: 0;
+    padding: 0;
+    text-indent: 0;
+}
+
+.s1 {
+    color: black;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 10.5pt;
+}
+
+.s2 {
+    color: black;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: none;
+    font-size: 10.5pt;
+}
+
+h1 {
+    color: black;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 10.5pt;
+}
+
+h2 {
+    color: black;
+    font-family: Arial, sans-serif;
+    font-style: normal;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 9.5pt;
+}
+
+.p,
+p {
+    color: black;
+    font-family: Arial, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: none;
+    font-size: 9.5pt;
+    margin: 0pt;
+}
+
+.s3 {
+    color: black;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: none;
+    font-size: 10.5pt;
+}
+
+.a {
+    color: #0562c1;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: underline;
+    font-size: 10.5pt;
+}
+
+.s4 {
+    color: #0562c1;
+    font-family: Calibri, sans-serif;
+    font-style: normal;
+    font-weight: normal;
+    text-decoration: none;
+    font-size: 10.5pt;
+}
+
+.s5 {
+    color: #fff;
+    font-family: Arial, sans-serif;
+    font-style: normal;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 9.5pt;
+}
+
+table,
+tbody {
+    vertical-align: top;
+    overflow: visible;
+}

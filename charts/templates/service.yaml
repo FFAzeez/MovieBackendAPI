@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: insureservice-service
+  namespace: {{ .Values.namespace }}
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  # type: {{ .Values.service.type }}
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 8061
+  selector:
+    app: insureservice

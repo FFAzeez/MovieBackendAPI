@@ -1,0 +1,7 @@
+replicaCount: 1
+image:
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+service:
+  type: ClusterIP
+  port: 8061
